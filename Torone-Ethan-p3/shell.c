@@ -10,6 +10,15 @@
 
 
 /**
+ * Changes the CWD to the specified directory
+ */
+void changeDir(char * dir) {
+    char path[100] = "./";
+    strncat(path, dir, strlen(dir));
+    chdir(path);
+}
+
+/**
  * Executes a process using fork(2) and exec(3)
  *
  * @param argc the length of argv, or the number of arguments
@@ -31,12 +40,12 @@ void execute(int argc, char * argv[]) {
     if (pid == 0) {
         // Child process
         if (execvp(argv[0], argv) == -1) {
-            perror("");
+            perror("exec");
         }
         exit(EXIT_FAILURE);
     } else if (pid < 0) {
         // Error forking
-        perror("lsh");
+        perror("fork");
     } else {
         // Parent process
         do {
@@ -60,6 +69,10 @@ void launch(int argc, char * argv[]) {
     */
     if (strcmp(argv[0], "exit") == 0) {
         exit(0);
+    } else if (strcmp(argv[0], "cd") == 0) {
+        changeDir(argv[1]);
+    } else {
+        execute(argc, argv);
     }
 
 }
