@@ -5,9 +5,79 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <ctype.h>
+
 
 #define BUFF_SIZE 1024
 
+char * input_redirection_file;
+char * output_redirection_file;
+
+char  buffer[BUFF_SIZE];
+
+char* skipwhite(char* s) {
+  while (isspace(*s)) ++s;
+  return s;
+}
+
+
+/**
+ *
+ */
+void tokenise_redirect_input_output(char *cmd_exec) {
+    char *io_token[100];
+    char *new_cmd_exec1;
+    //new_cmd_exec1 = strdup(buffer);
+    new_cmd_exec1 = buffer;
+    int m = 1;
+    io_token[0] = strtok(new_cmd_exec1, "<");
+    while ((io_token[m] = strtok(NULL, ">")) != NULL)
+        m++;
+
+    io_token[1] = skipwhite(io_token[1]);
+    io_token[2] = skipwhite(io_token[2]);
+
+    input_redirection_file = strdup(io_token[1]);
+    output_redirection_file = strdup(io_token[2]);
+
+}
+
+/**
+ *
+ */
+void tokenise_redirect_input(char *cmd_exec) {
+    char *i_token[100];
+    char *new_cmd_exec1;
+    //new_cmd_exec1 = strdup(buffer);
+    new_cmd_exec1 = buffer;
+
+    int m = 1;
+    i_token[0] = strtok(new_cmd_exec1, "<");
+    while ((i_token[m] = strtok(NULL, "<")) != NULL)
+        m++;
+
+    i_token[1] = skipwhite(i_token[1]);
+    input_redirection_file = strdup(i_token[1]);
+}
+
+/**
+ *
+ */
+void tokenise_redirect_output(char * cmd_exec) {
+    char *o_token[100];
+    char *new_cmd_exec1;
+    //new_cmd_exec1 = strdup(buffer);
+    new_cmd_exec1 = buffer;
+
+    int m = 1;
+    o_token[0]=strtok(new_cmd_exec1, ">");
+    while((o_token[m] = strtok(NULL, ">"))!=NULL)
+        m++;
+
+    o_token[1]=skipwhite(o_token[1]);
+    output_redirection_file = strdup(o_token[1]);
+
+}
 
 /**
  * Changes the CWD to the specified directory
@@ -81,10 +151,47 @@ void launch(int argc, char * argv[]) {
  * Reads a line from standard input and parses it into an array of c-strings
  */
 void readCommand() {
-    char  buffer[BUFF_SIZE];
+
+    int input_fd, output_fd, input_redirection, output_redirection;
     int rres = read(STDIN_FILENO, buffer, BUFF_SIZE);
     //printf("%d: %s\n", rres, buffer);
     buffer[rres] = '\0';
+
+    char * redirect  = strdup(buffer);
+
+    if (strchr(buffer, '<') && strchr(buffer, '>')) {
+        input_redirection = 1;
+        output_redirection = 1;
+        tokenise_redirect_input_output(redirect);
+    }
+    else if (strchr(buffer, '<')) {
+        input_redirection=1;
+        tokenise_redirect_input(redirect);
+    }
+    else if (strchr(buffer, '>')) {
+        output_redirection=1;
+        tokenise_redirect_output(redirect);
+    }
+    if (output_redirection == 1) {
+        output_fd= creat(output_redirection_file, 0644);
+        if (output_fd < 0) {
+            fprintf(stderr, "Failed to open %s for writing\n", output_redirection_file);
+            exit(EXIT_FAILURE);
+        }
+        dup2(output_fd, 1);
+        close(output_fd);
+        output_redirection=0;
+    }
+    if (input_redirection  == 1) {
+        input_fd=open(input_redirection_file,O_RDONLY, 0);
+        if (input_fd < 0) {
+            fprintf(stderr, "Failed to open %s for reading\n", input_redirection_file);
+            exit(EXIT_FAILURE);
+        }
+        dup2(input_fd, 0);
+        close(input_fd);
+        input_redirection=0;
+    }
 
     int i = 0, tokSize = 64;
 
@@ -149,8 +256,16 @@ void printPrompt() {
 int main(int argc, char * argv[]) {
     setbuf(stdout, NULL);
     chdir("/home/");
+
+    int in = dup(STDIN_FILENO), out = dup(STDOUT_FILENO);
     while(1) {
         printPrompt();
         readCommand();
+
+        dup2(in, STDIN_FILENO);
+        dup2(out, STDOUT_FILENO);
+
+        fflush(stdin);
+        fflush(stdout);
     }
 }
