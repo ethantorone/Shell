@@ -6,3 +6,4 @@ compile:
 
 clean:
 	rm -f shell
+	rm -f *.txt*
