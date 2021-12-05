@@ -12,12 +12,13 @@
 
 int input_redirection, output_redirection, append, in, out;
 
+char *new_cmd_exec1;
 char * input_redirection_file;
 char * output_redirection_file;
 
 char * cmd;
 char * delims = " \t\r\n\a";
-
+char ** tokens;
 
 /**
  * Places the file after the '>' as the new output redirection file and
@@ -25,7 +26,6 @@ char * delims = " \t\r\n\a";
  */
 void tokenise_redirect_input_output(char *cmd_exec) {
     char *io_token[100];
-    char *new_cmd_exec1;
     //dupes string as to not modify original
     new_cmd_exec1 = strdup(cmd_exec);
 
@@ -45,7 +45,7 @@ void tokenise_redirect_input_output(char *cmd_exec) {
     output_redirection_file = strdup(io_token[2]);
 
     cmd = strdup(io_token[0]);
-
+    free(new_cmd_exec1);
 }
 
 /**
@@ -53,7 +53,6 @@ void tokenise_redirect_input_output(char *cmd_exec) {
  */
 void tokenise_redirect_input(char *cmd_exec) {
     char *i_token[100];
-    char *new_cmd_exec1;
     //dupes string as to not modify original
     new_cmd_exec1 = strdup(cmd_exec);
 
@@ -68,6 +67,7 @@ void tokenise_redirect_input(char *cmd_exec) {
     input_redirection_file = strdup(i_token[1]);
 
     cmd = strdup(i_token[0]);
+    free(new_cmd_exec1);
 }
 
 /**
@@ -80,7 +80,7 @@ void tokenise_redirect_output(char * cmd_exec) {
     }
 
     char *o_token[100];
-    char *new_cmd_exec1;
+
     //dupes string as to not modify original
     new_cmd_exec1 = strdup(cmd_exec);
 
@@ -95,12 +95,16 @@ void tokenise_redirect_output(char * cmd_exec) {
     output_redirection_file = strdup(o_token[1]);
 
     cmd = strdup(o_token[0]);
+    free(new_cmd_exec1);
 }
 
 /**
  * Sets stdin and stdout back to normal.
  */
 void reset_io() {
+    free(cmd);
+    free(tokens);
+
     dup2(in, STDIN_FILENO);
     dup2(out, STDOUT_FILENO);
 
@@ -121,12 +125,16 @@ void redirect_io() {
         } else {
             output_fd = creat(output_redirection_file, 0644);
         }
+
+
         if (output_fd < 0) {
             fprintf(stderr, "Failed to open %s for writing\n", output_redirection_file);
             reset_io();
             output_redirection = 0;
+            free(output_redirection_file);
             return;;
         }
+        free(output_redirection_file);
         dup2(output_fd, 1);
         close(output_fd);
         append = 0;
@@ -139,8 +147,10 @@ void redirect_io() {
             fprintf(stderr, "Failed to open %s for reading\n", input_redirection_file);
             reset_io();
             input_redirection = 0;
+            free(input_redirection_file);
             return;
         }
+        free(input_redirection_file);
         dup2(input_fd, 0);
         close(input_fd);
         input_redirection=0;
@@ -205,6 +215,7 @@ void launch(int argc, char * argv[]) {
     }
     */
     if (strcmp(argv[0], "exit") == 0) {
+        reset_io();
         exit(0);
     } else if (strcmp(argv[0], "cd") == 0) {
         changeDir(argv[1]);
@@ -239,7 +250,7 @@ void readCommand() {
     int i = 0, tokSize = 64;
 
     //can initially hold 64 tokens
-    char ** tokens = malloc(tokSize * sizeof(char*));
+    tokens = malloc(tokSize * sizeof(char*));
     char * token;
 
     //if tokens == 0, it does not have a memory address
@@ -275,7 +286,6 @@ void readCommand() {
     tokens[i] = NULL; //safeguard, whatever is after the last token is NULL
     launch(i, tokens);
 
-    free(tokens);
 }
 
 /**
